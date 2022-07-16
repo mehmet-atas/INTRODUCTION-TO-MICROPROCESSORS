@@ -1,0 +1,73 @@
+GPIO_PORTF_DATA  	EQU 0x400253FC
+GPIO_PORTF_AMSEL 	EQU 0x40025528
+GPIO_PORTF_PCTL  	EQU 0x4002552C
+GPIO_PORTF_PDR 		EQU 0x40025514
+GPIO_PORTF_DIR   	EQU 0x40025400
+GPIO_PORTF_IM		EQU 0x40025410
+GPIO_PORTF_RIS		EQU 0x40025414
+GPIO_PORTF_AFSEL 	EQU 0x40025420
+GPIO_PORTF_PUR   	EQU 0x40025510
+GPIO_PORTF_DEN   	EQU 0x4002551C
+GPIO_PORTF_LOCK  	EQU 0x40025520
+GPIO_PORTF_CR   	EQU 0x40025524
+GPIO_PORTF_MIS		EQU 0x40025418
+GPIO_PORTF_ICR		EQU 0x4002541C
+
+SYSCTL_RCGCGPIO		EQU 0x400FE608
+SYSCTL_PRGPIO		EQU 0x400FEA08	;GPIO Peripheral Ready, pg.406
+
+UNLOCK 				EQU	0x4C4F434B
+;The GPIOLOCK register enables write access to the GPIOCR register (see page 685). 
+;Writing 0x4C4F.434B to the GPIOLOCK register unlocks the GPIOCR register. 
+;LABEL		DIRECTIVE		VALUE		COMMENT
+			AREA			portf_unlock, CODE, READONLY
+			THUMB
+			EXPORT		PortF_unlock
+				
+PortF_unlock	PROC
+				PUSH{R0,R1}
+				LDR R1,=SYSCTL_RCGCGPIO ;Start the clock
+				LDR R0,[R1]
+				ORR R0,R0,#0x20 ;ENABLE PORT F
+				STR R0,[R1]
+				;poll PR register
+				LDR R1,=SYSCTL_PRGPIO
+poll_gpio		LDR R0,[R1]					;Let the clock settles.
+				LSRS R0,#6
+				BCC poll_gpio
+				
+				LDR R1,=GPIO_PORTF_LOCK		;Unlock PortF
+				LDR R0,=UNLOCK
+				STR R0,[R1]
+				
+				LDR R1,=GPIO_PORTF_CR		;Make registers writable
+				MOV R0,#0xFF
+				STR R0,[R1]
+				;Select Directions
+				LDR R1,=GPIO_PORTF_DIR		;SW1 and SW2 as inputs
+				LDR R0,[R1]					;and RGB led as output
+				ORR R0,R0,#0x0E				 
+				BIC R0,R0,#0x11				
+				STR R0,[R1]
+				
+				LDR R1,=GPIO_PORTF_AMSEL
+				LDR R0,[R1]
+				BIC R0,R0,#0x1F
+				STR R0,[R1]
+				
+				LDR R1,=GPIO_PORTF_DEN
+				LDR R0,[R1]
+				ORR R0,R0,#0x1F
+				STR R0,[R1]
+				
+				LDR R1,=GPIO_PORTF_PUR
+				LDR R0,[R1]
+				ORR R0,R0,#0x11
+				STR R0,[R1]
+
+				POP{R0,R1}
+				
+				BX LR
+			ENDP
+		END	
+				
